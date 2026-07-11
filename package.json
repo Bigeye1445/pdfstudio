@@ -1,6 +1,6 @@
 {
   "name": "pdfstudio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Client-side PDF toolkit powered by qpdf compiled to WebAssembly. Lock, unlock, change/remove passwords, merge, split, and rotate PDFs entirely in the browser — no server, files never leave the device.",
   "type": "module",
   "license": "Apache-2.0",

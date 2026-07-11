@@ -99,6 +99,46 @@ async function init() {
     addResult(rename(f.name, 'rotated'), rotated);
   });
 
+  wire('btn-delete', async () => {
+    const f = current();
+    const pages = value('delete-pages').trim();
+    need(pages.length > 0, 'Enter a page selection to delete, e.g. 2-3');
+    const out = await pdf.deletePages(f.bytes, { pages, ...passwordFor(f) });
+    addResult(rename(f.name, 'trimmed'), out);
+  });
+
+  wire('btn-compress', async () => {
+    const f = current();
+    const out = await pdf.compress(f.bytes, passwordFor(f));
+    addResult(rename(f.name, 'compressed'), out);
+  });
+
+  wire('btn-repair', async () => {
+    const f = current();
+    const out = await pdf.repair(f.bytes, passwordFor(f));
+    addResult(rename(f.name, 'repaired'), out);
+  });
+
+  wire('btn-flatten', async () => {
+    const f = current();
+    const out = await pdf.flatten(f.bytes, passwordFor(f));
+    addResult(rename(f.name, 'flattened'), out);
+  });
+
+  wire('btn-reverse', async () => {
+    const f = current();
+    const out = await pdf.reversePages(f.bytes, passwordFor(f));
+    addResult(rename(f.name, 'reversed'), out);
+  });
+
+  wire('btn-info', async () => {
+    const f = current();
+    const info = await pdf.getInfo(f.bytes, passwordFor(f));
+    const box = $<HTMLPreElement>('info-output');
+    box.hidden = false;
+    box.textContent = JSON.stringify(info, null, 2);
+  });
+
   wire('btn-extract', async () => {
     const f = current();
     const pages = value('extract-pages').trim();

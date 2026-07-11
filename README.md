@@ -42,7 +42,15 @@ Node). No uploads, no server, no telemetry.
 | ✂️ **Split** | One document per page, or N pages per document |
 | 🎯 **Extract pages** | Pull any page selection into a new document |
 | 🔄 **Rotate** | Relative or absolute rotation, per page range |
-| 🔍 **Inspect** | Page count, encryption status, password requirements |
+| 🗑 **Delete pages** | Remove a selection, keep the rest — plus reverse page order |
+| 🂠 **Collate** | Interleave pages from multiple documents (fronts + backs of a scan) |
+| 💧 **Watermark** | Overlay or underlay pages from another PDF — stamps, letterheads |
+| 🗜 **Compress** | Lossless stream recompression + object streams; linearize for fast web view |
+| 🩹 **Repair** | Reconstruct damaged cross-reference tables and recoverable corruption |
+| 📎 **Attachments** | Add, list, extract, and remove embedded files |
+| 🫓 **Flatten** | Bake annotations & form fields into page content |
+| 🔍 **Inspect** | `getInfo()`: PDF version, page count, encryption scheme & permissions, attachments |
+| 🖼 **Images → PDF** | Build a PDF from JPEGs in pure TypeScript (no recompression) |
 | 🛠 **Escape hatch** | Run any qpdf CLI invocation via `raw()` |
 
 Works in browsers (main thread or Web Worker), and in Node.js ≥ 18 — handy
@@ -160,12 +168,88 @@ await pdf.rotate(doc, { angle: -90, pages: '1-3' });   // counter-clockwise
 await pdf.rotate(doc, { angle: 180, absolute: true }); // set exact rotation
 ```
 
+### Delete, reverse, collate
+
+```ts
+const trimmed  = await pdf.deletePages(doc, { pages: '2-3' });
+const backward = await pdf.reversePages(doc);
+
+// Interleave: page 1 of A, page 1 of B, page 2 of A, … Great for
+// combining separately scanned fronts and backs:
+const combined = await pdf.collate([fronts, { data: backs, pages: 'z-1' }]);
+```
+
+### Watermark / stamp
+
+Overlay (or underlay) pages from another PDF. `repeat: 1` tiles a
+single-page stamp across the whole document:
+
+```ts
+const stamped = await pdf.watermark(doc, confidentialStamp, { repeat: 1 });
+const letterheaded = await pdf.watermark(doc, letterhead, {
+  mode: 'underlay',   // draw behind the page content
+  to: '1',            // first page only
+});
+```
+
+### Compress, linearize, repair
+
+```ts
+const smaller = await pdf.compress(doc);                    // lossless
+const fast    = await pdf.linearize(doc);                   // fast web view
+const fixed   = await pdf.repair(brokenDoc);                // rebuild xref
+```
+
+### Attachments
+
+```ts
+const withFile = await pdf.addAttachment(doc, {
+  data: jsonBytes,
+  name: 'invoice.json',
+  mimeType: 'application/json',
+});
+await pdf.listAttachments(withFile);                        // [{ name: 'invoice.json', … }]
+const bytes = await pdf.getAttachment(withFile, { name: 'invoice.json' });
+const clean = await pdf.removeAttachment(withFile, { name: 'invoice.json' });
+```
+
+### Flatten
+
+Bake annotations and form-field appearances into the page content —
+useful before printing, splitting, or sharing:
+
+```ts
+const flat = await pdf.flatten(doc);
+```
+
 ### Inspect
 
 ```ts
 await pdf.pageCount(doc);          // number
 await pdf.isEncrypted(doc);        // boolean
 await pdf.requiresPassword(doc);   // false for empty-user-password files
+
+const info = await pdf.getInfo(locked, { password: 'pw' });
+// {
+//   pdfVersion: '2.0', pageCount: 12, encrypted: true,
+//   encryption: {
+//     bits: 256, method: 'AESv3',
+//     userPasswordMatched: true, ownerPasswordMatched: false,
+//     permissions: { print: false, extract: false, modify: false, … },
+//   },
+//   attachments: [],
+// }
+```
+
+### Images → PDF
+
+`imagesToPdf` needs no wasm at all — JPEG data is embedded verbatim
+(no recompression, no quality loss), one page per image:
+
+```ts
+import { imagesToPdf } from 'pdfstudio';
+
+const album = await imagesToPdf([scan1, scan2, photo], { dpi: 300 });
 ```
 
 ### Escape hatch
@@ -174,14 +258,9 @@ Anything else qpdf can do is reachable through `raw()`. Inputs are staged as
 `$in0`, `$in1`, …; write output to `$out`:
 
 ```ts
-// Linearize ("fast web view"):
-const fast = await pdf.raw([doc], ['--linearize', '$in0', '$out']);
-
-// Watermark every page:
-const stamped = await pdf.raw(
-  [doc, watermark],
-  ['--overlay', '$in1', '--', '$in0', '$out'],
-);
+// Two-up page layout? n-up is about the only thing qpdf can't do —
+// but e.g. splitting into groups of pages after each bookmark, etc.:
+const out = await pdf.raw([doc], ['--pages', '$in0', '1-z:odd', '--', '--empty', '$out']);
 ```
 
 ### Page selections
@@ -198,7 +277,7 @@ Anywhere a `pages` option appears, use qpdf's
 | `'r2'` | second-to-last |
 | `'z-1'` | all pages, reversed |
 | `'1-9:odd'` | odd positions within the range |
-| `'1-z:x3-4'` | everything except pages 3–4 |
+| `'1-z,x3-4'` | everything except pages 3–4 |
 | `[1, '4-8', 'z']` | arrays mix numbers and ranges |
 
 ### Web Workers
@@ -228,7 +307,7 @@ Requirements: [Emscripten](https://emscripten.org) and CMake
 
 ```sh
 npm run build:wasm   # downloads qpdf sources, compiles → src/wasm/
-npm test             # 23 end-to-end tests through the real wasm
+npm test             # 43 end-to-end tests through the real wasm
 npm run build        # emits dist/ (ESM + d.ts + wasm)
 ```
 

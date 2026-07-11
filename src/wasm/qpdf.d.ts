@@ -8,6 +8,12 @@ export interface QpdfFS {
   unlink(path: string): void;
   rmdir(path: string): void;
   analyzePath(path: string): { exists: boolean };
+  /** Redirect stdio at the byte level; must be called during preRun. */
+  init(
+    input: (() => number | null) | null,
+    output: ((byte: number | null) => void) | null,
+    error: ((byte: number | null) => void) | null,
+  ): void;
 }
 
 export interface QpdfModule {
@@ -19,6 +25,8 @@ export interface QpdfModuleInit {
   print?(text: string): void;
   printErr?(text: string): void;
   locateFile?(path: string, prefix: string): string;
+  /** Callbacks run during module startup, after FS exists but before main. */
+  preRun?: Array<() => void>;
 }
 
 declare function createQpdfModule(init?: QpdfModuleInit): Promise<QpdfModule>;

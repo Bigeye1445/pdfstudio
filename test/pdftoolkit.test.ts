@@ -17,7 +17,7 @@ describe('inspection', () => {
     const bytes = makePdf(2);
     const buffer = bytes.slice().buffer;
     expect(await pdf.pageCount(buffer)).toBe(2);
-    expect(await pdf.pageCount(new Blob([bytes]))).toBe(2);
+    expect(await pdf.pageCount(new Blob([bytes as BlobPart]))).toBe(2);
   });
 
   it('reports unencrypted files', async () => {

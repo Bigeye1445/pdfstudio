@@ -3,105 +3,158 @@ import type { PdfInput, PdfToolkitOptions } from './types.js';
 
 export interface RunResult {
   exitCode: number;
-  stdout: string;
+  /** Raw stdout bytes — qpdf writes binary data here for some commands. */
+  stdout: Uint8Array;
+  /** stdout decoded as UTF-8 text. */
+  stdoutText: string;
+  /** stderr decoded as UTF-8 text. */
   stderr: string;
 }
 
+export interface JobContext {
+  dir: string;
+  inputPaths: string[];
+  exec: (args: string[]) => RunResult;
+  fs: QpdfModule['FS'];
+}
+
 /**
- * Owns the Emscripten module instance: loads it, serializes operations
- * (the wasm instance is single-threaded and not reentrant), stages input
- * files into MEMFS, and collects stdout/stderr per run.
+ * Runs qpdf jobs. The wasm binary is fetched and compiled once; every job
+ * then gets its own fresh instance (instantiating a precompiled
+ * `WebAssembly.Module` costs ~1 ms). Fresh instances matter for
+ * correctness, not just isolation: qpdf keeps global state across
+ * `callMain` calls — e.g. its logger refuses to redirect stdout once
+ * stdout has been used — so a long-lived instance eventually breaks.
+ * They also make jobs safely concurrent.
+ *
+ * stdout/stderr are captured at the byte level via FS.init so that
+ * commands emitting binary output (e.g. --show-attachment) round-trip
+ * losslessly.
  */
 export class QpdfRunner {
-  private module: QpdfModule;
-  private queue: Promise<unknown> = Promise.resolve();
-  private jobId = 0;
-  private stdoutBuf: string[] = [];
-  private stderrBuf: string[] = [];
+  private compiled: WebAssembly.Module;
+  private createModule: (init: object) => Promise<QpdfModule>;
 
-  private constructor(module: QpdfModule) {
-    this.module = module;
+  private constructor(
+    compiled: WebAssembly.Module,
+    createModule: (init: object) => Promise<QpdfModule>,
+  ) {
+    this.compiled = compiled;
+    this.createModule = createModule;
   }
 
   static async create(options: PdfToolkitOptions = {}): Promise<QpdfRunner> {
     const { default: createQpdfModule } = await import('./wasm/qpdf.js');
-    let runner: QpdfRunner;
-    const module = await createQpdfModule({
-      print: (text) => runner.stdoutBuf.push(text),
-      printErr: (text) => runner.stderrBuf.push(text),
-      ...(options.wasmUrl !== undefined && {
-        locateFile: (path: string, prefix: string) =>
-          path.endsWith('.wasm') ? String(options.wasmUrl) : prefix + path,
-      }),
-    });
-    runner = new QpdfRunner(module);
-    return runner;
+    const url = resolveWasmUrl(options.wasmUrl);
+    const compiled = await WebAssembly.compile(await loadWasmBytes(url));
+    return new QpdfRunner(compiled, createQpdfModule as (init: object) => Promise<QpdfModule>);
   }
 
   /**
-   * Run qpdf with `args` inside a fresh MEMFS working directory.
-   * `inputs` are staged as numbered files; `job(dir)` receives the directory
-   * path and the staged file paths via the second argument of `buildArgs`.
+   * Run one or more qpdf invocations against a fresh instance, with
+   * `inputs` staged as numbered files in a MEMFS working directory.
    */
-  async run<T>(
-    inputs: PdfInput[],
-    job: (ctx: {
-      dir: string;
-      inputPaths: string[];
-      exec: (args: string[]) => RunResult;
-      fs: QpdfModule['FS'];
-    }) => T | Promise<T>,
-  ): Promise<T> {
-    const result = this.queue.then(async () => {
-      const dir = `/job${++this.jobId}`;
-      const fs = this.module.FS;
-      fs.mkdir(dir);
-      const inputPaths: string[] = [];
-      try {
-        for (let i = 0; i < inputs.length; i++) {
-          const path = `${dir}/in${i}.pdf`;
-          fs.writeFile(path, await toBytes(inputs[i]!));
-          inputPaths.push(path);
-        }
-        return await job({
-          dir,
-          inputPaths,
-          exec: (args) => this.exec(args),
-          fs,
-        });
-      } finally {
-        for (const name of fs.readdir(dir)) {
-          if (name !== '.' && name !== '..') fs.unlink(`${dir}/${name}`);
-        }
-        fs.rmdir(dir);
-      }
-    });
-    // Keep the queue alive even when this job fails.
-    this.queue = result.catch(() => undefined);
-    return result;
-  }
+  async run<T>(inputs: PdfInput[], job: (ctx: JobContext) => T | Promise<T>): Promise<T> {
+    const stagedInputs = await Promise.all(inputs.map(toBytes));
 
-  private exec(args: string[]): RunResult {
-    this.stdoutBuf = [];
-    this.stderrBuf = [];
-    let exitCode: number;
-    try {
-      exitCode = this.module.callMain(args);
-    } catch (e) {
-      // qpdf may terminate via exit(); Emscripten surfaces that as an
-      // ExitStatus throw when EXIT_RUNTIME=0.
-      if (isExitStatus(e)) {
-        exitCode = e.status;
-      } else {
-        throw e;
-      }
-    }
-    return {
-      exitCode: exitCode ?? 0,
-      stdout: this.stdoutBuf.join('\n'),
-      stderr: this.stderrBuf.join('\n'),
+    const stdoutBytes: number[] = [];
+    const stderrBytes: number[] = [];
+    // moduleArg doubles as the Module object, so by the time preRun fires
+    // (the documented place to call FS.init) its FS property is populated.
+    const moduleArg: {
+      FS?: QpdfModule['FS'];
+      preRun: Array<() => void>;
+      instantiateWasm: (
+        imports: WebAssembly.Imports,
+        onSuccess: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+      ) => Record<string, never>;
+    } = {
+      preRun: [
+        () => {
+          moduleArg.FS!.init(
+            null,
+            (byte: number | null) => {
+              if (byte !== null) stdoutBytes.push(byte);
+            },
+            (byte: number | null) => {
+              if (byte !== null) stderrBytes.push(byte);
+            },
+          );
+        },
+      ],
+      instantiateWasm: (imports, onSuccess) => {
+        WebAssembly.instantiate(this.compiled, imports).then((instance) =>
+          onSuccess(instance, this.compiled),
+        );
+        return {};
+      },
     };
+    const module = await this.createModule(moduleArg);
+
+    const dir = '/job';
+    module.FS.mkdir(dir);
+    const inputPaths = stagedInputs.map((bytes, i) => {
+      const path = `${dir}/in${i}.pdf`;
+      module.FS.writeFile(path, bytes);
+      return path;
+    });
+
+    const exec = (args: string[]): RunResult => {
+      stdoutBytes.length = 0;
+      stderrBytes.length = 0;
+      let exitCode: number;
+      try {
+        exitCode = module.callMain(args);
+      } catch (e) {
+        // qpdf may terminate via exit(); Emscripten surfaces that as an
+        // ExitStatus throw when EXIT_RUNTIME=0.
+        if (isExitStatus(e)) {
+          exitCode = e.status;
+        } else {
+          throw e;
+        }
+      }
+      const stdout = new Uint8Array(stdoutBytes);
+      return {
+        exitCode: exitCode ?? 0,
+        stdout,
+        stdoutText: decoder.decode(stdout),
+        stderr: decoder.decode(new Uint8Array(stderrBytes)),
+      };
+    };
+
+    // The instance (and its MEMFS) is discarded afterwards, so no cleanup.
+    return job({ dir, inputPaths, exec, fs: module.FS });
   }
+}
+
+const decoder = new TextDecoder();
+
+function resolveWasmUrl(wasmUrl: string | URL | undefined): URL {
+  if (wasmUrl === undefined) return new URL('./wasm/qpdf.wasm', import.meta.url);
+  if (wasmUrl instanceof URL) return wasmUrl;
+  // Resolve strings against the page when in a browser, else this module.
+  const base =
+    typeof location !== 'undefined' && typeof location.href === 'string'
+      ? location.href
+      : import.meta.url;
+  return new URL(wasmUrl, base);
+}
+
+async function loadWasmBytes(url: URL): Promise<Uint8Array<ArrayBuffer>> {
+  if (url.protocol === 'file:') {
+    // Computed specifier so browser bundlers neither resolve nor include
+    // the Node-only module; this branch can only execute under Node.
+    const { readFile } = (await import('node' + ':fs/promises')) as {
+      readFile: (path: URL) => Promise<Uint8Array>;
+    };
+    return new Uint8Array(await readFile(url));
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch qpdf.wasm from ${url}: HTTP ${response.status}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 function isExitStatus(e: unknown): e is { status: number } {
@@ -113,7 +166,7 @@ function isExitStatus(e: unknown): e is { status: number } {
   );
 }
 
-async function toBytes(input: PdfInput): Promise<Uint8Array> {
+export async function toBytes(input: PdfInput): Promise<Uint8Array> {
   if (input instanceof Uint8Array) return input;
   if (input instanceof ArrayBuffer) return new Uint8Array(input);
   if (typeof Blob !== 'undefined' && input instanceof Blob) {

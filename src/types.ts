@@ -116,6 +116,134 @@ export interface PasswordOption {
   password?: string;
 }
 
+export interface CompressOptions {
+  /** Password, if the input is encrypted. */
+  password?: string;
+  /**
+   * Recompress already-compressed streams with zlib at the given level
+   * (1–9). Default: recompress at level 9.
+   */
+  compressionLevel?: number;
+  /** Pack objects into object streams for smaller files. Default `true`. */
+  objectStreams?: boolean;
+  /** Also linearize the output for fast web view. Default `false`. */
+  linearize?: boolean;
+}
+
+export interface WatermarkOptions {
+  /**
+   * Where the stamp is drawn: `'overlay'` (on top of the page, default)
+   * or `'underlay'` (behind the page content).
+   */
+  mode?: 'overlay' | 'underlay';
+  /** Password of the stamp document, if encrypted. */
+  stampPassword?: string;
+  /** Pages of the target document to stamp. Default: all. */
+  to?: PageSelection;
+  /** Pages of the stamp document to use, in order. Default: `1-z`. */
+  from?: PageSelection;
+  /**
+   * Stamp pages to repeat once `from` runs out — e.g. `1` or `'1-z'` to
+   * tile a single-page watermark across the whole document.
+   */
+  repeat?: PageSelection;
+  /** Password of the target document, if encrypted. */
+  password?: string;
+}
+
+export interface DeletePagesOptions {
+  /** Pages to remove. */
+  pages: PageSelection;
+  /** Password, if the input is encrypted. */
+  password?: string;
+}
+
+export interface CollateOptions {
+  /** Pages taken from each document per round. Default `1` (interleave). */
+  groupSize?: number;
+}
+
+export interface FlattenOptions {
+  /** Password, if the input is encrypted. */
+  password?: string;
+  /**
+   * Which annotations to include: `'all'` (default), `'print'` (only those
+   * that print), or `'screen'` (only those shown on screen).
+   */
+  annotations?: 'all' | 'print' | 'screen';
+}
+
+export interface AddAttachmentOptions {
+  /** File content to attach. */
+  data: PdfInput;
+  /** Key in the PDF's embedded-files table, and the displayed filename. */
+  name: string;
+  /** MIME type, e.g. `application/json`. */
+  mimeType?: string;
+  /** Human-readable description shown by some viewers. */
+  description?: string;
+  /** Password, if the input PDF is encrypted. */
+  password?: string;
+}
+
+export interface AttachmentRef {
+  /** Attachment name (embedded-files table key). */
+  name: string;
+  /** Password, if the PDF is encrypted. */
+  password?: string;
+}
+
+export interface AttachmentInfo {
+  /** Key in the embedded-files table. */
+  name: string;
+  /** Preferred display filename, when present. */
+  filename?: string;
+  /** Description, when present. */
+  description?: string;
+}
+
+export interface PdfPermissionsInfo {
+  accessibility: boolean;
+  extract: boolean;
+  print: boolean;
+  modify: boolean;
+  annotate: boolean;
+  fillForms: boolean;
+  assemble: boolean;
+}
+
+export interface PdfEncryptionInfo {
+  /** Effective key length in bits. */
+  bits: number;
+  /** Encryption method for streams, e.g. `'AESv3'`, `'AESv2'`, `'RC4'`. */
+  method: string;
+  /** Whether the supplied password matched the user password. */
+  userPasswordMatched: boolean;
+  /** Whether the supplied password matched the owner password. */
+  ownerPasswordMatched: boolean;
+  /** What the user-password holder is allowed to do. */
+  permissions: PdfPermissionsInfo;
+}
+
+export interface PdfInfo {
+  /** PDF specification version of the file, e.g. `'1.7'`, `'2.0'`. */
+  pdfVersion: string;
+  pageCount: number;
+  encrypted: boolean;
+  /** Present only when `encrypted` is true. */
+  encryption?: PdfEncryptionInfo;
+  attachments: AttachmentInfo[];
+}
+
+export interface ImagesToPdfOptions {
+  /**
+   * Resolution the pixel dimensions are mapped at, in dots per inch.
+   * Each page is sized to its image: at the default 72 dpi one pixel
+   * equals one PDF point.
+   */
+  dpi?: number;
+}
+
 export interface PdfToolkitOptions {
   /**
    * Override the location of `qpdf.wasm`. Useful when your bundler moves
