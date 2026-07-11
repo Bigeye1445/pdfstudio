@@ -92,7 +92,7 @@ export class QpdfRunner {
         return {};
       },
     };
-    const module = await this.createModule(moduleArg);
+    const module = await withNodeDetectionDisabledInWorkers(() => this.createModule(moduleArg));
 
     const dir = '/job';
     module.FS.mkdir(dir);
@@ -132,6 +132,38 @@ export class QpdfRunner {
 }
 
 const decoder = new TextDecoder();
+
+/**
+ * `navigator.userAgent` is `'Cloudflare-Workers'` in the Workers runtime,
+ * regardless of the `nodejs_compat` compatibility flag — unlike
+ * `process`, which `nodejs_compat` polyfills.
+ */
+const isCloudflareWorkers =
+  typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers';
+
+/**
+ * qpdf's Emscripten-generated wasm glue picks its code path by checking
+ * `globalThis.process?.versions?.node`. Cloudflare Workers' `nodejs_compat`
+ * flag polyfills `process` (including `versions.node`) for compatibility
+ * with npm packages that expect it — which makes the glue's environment
+ * check misidentify the Workers runtime as real Node.js. That path calls
+ * `createRequire(import.meta.url)`, which throws in a bundled Worker
+ * because there's no real `file:` URL to resolve.
+ *
+ * Real Node.js has no `navigator`, so this only ever hides `process`
+ * inside the Workers runtime — never in an actual Node.js process.
+ */
+async function withNodeDetectionDisabledInWorkers<T>(fn: () => Promise<T>): Promise<T> {
+  const globals = globalThis as Record<string, unknown>;
+  if (!isCloudflareWorkers || typeof globals.process === 'undefined') return fn();
+  const realProcess = globals.process;
+  delete globals.process;
+  try {
+    return await fn();
+  } finally {
+    globals.process = realProcess;
+  }
+}
 
 function resolveWasmUrl(wasmUrl: string | URL | undefined): URL {
   if (wasmUrl === undefined) return new URL('./wasm/qpdf.wasm', import.meta.url);
