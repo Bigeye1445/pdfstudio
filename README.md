@@ -1,5 +1,8 @@
 # pdfstudio
 
+[![npm](https://img.shields.io/npm/v/pdfstudio)](https://www.npmjs.com/package/pdfstudio)
+[![license](https://img.shields.io/npm/l/pdfstudio)](./LICENSE)
+
 **A client-side PDF toolkit for the browser.** Lock, unlock, change or remove
 passwords, merge, split, extract, and rotate PDFs — with nothing leaving the
 device. Powered by [qpdf](https://qpdf.sourceforge.io/) compiled to
