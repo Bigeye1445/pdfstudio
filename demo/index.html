@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pdfstudio — client-side PDF toolkit</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>pdfstudio</h1>
+      <p>
+        Lock, unlock, merge, split &amp; rotate PDFs — entirely in your browser.
+        Powered by <a href="https://qpdf.sourceforge.io/">qpdf</a> compiled to
+        WebAssembly. <strong>Files never leave your device.</strong>
+      </p>
+      <p id="status" class="status">Loading WebAssembly module…</p>
+    </header>
+
+    <main hidden id="app">
+      <section class="card">
+        <h2>1 · Add PDFs</h2>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept="application/pdf" multiple />
+          <span>Drop PDFs here or click to choose</span>
+        </label>
+        <ul id="file-list" class="file-list"></ul>
+      </section>
+
+      <section class="card">
+        <h2>2 · Do something</h2>
+
+        <details open>
+          <summary>Merge</summary>
+          <p class="hint">Combines every file above, in order.</p>
+          <button id="btn-merge">Merge all files</button>
+        </details>
+
+        <details>
+          <summary>Lock (encrypt)</summary>
+          <div class="row">
+            <input id="lock-password" type="password" placeholder="Password" autocomplete="new-password" />
+            <label><input type="checkbox" id="lock-no-print" /> disallow printing</label>
+            <label><input type="checkbox" id="lock-no-copy" /> disallow copying</label>
+            <button id="btn-lock">Lock selected</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Unlock / remove password</summary>
+          <div class="row">
+            <input id="unlock-password" type="password" placeholder="Current password" autocomplete="current-password" />
+            <button id="btn-unlock">Unlock selected</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Change password</summary>
+          <div class="row">
+            <input id="change-old" type="password" placeholder="Current password" />
+            <input id="change-new" type="password" placeholder="New password" />
+            <button id="btn-change">Change password</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Split</summary>
+          <div class="row">
+            <label>pages per file <input id="split-n" type="number" min="1" value="1" /></label>
+            <button id="btn-split">Split selected</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Rotate</summary>
+          <div class="row">
+            <select id="rotate-angle">
+              <option value="90">90° clockwise</option>
+              <option value="-90">90° counter-clockwise</option>
+              <option value="180">180°</option>
+            </select>
+            <input id="rotate-pages" placeholder="pages e.g. 1-3,z (blank = all)" />
+            <button id="btn-rotate">Rotate selected</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Extract pages</summary>
+          <div class="row">
+            <input id="extract-pages" placeholder="pages e.g. 2-5,9" />
+            <button id="btn-extract">Extract from selected</button>
+          </div>
+        </details>
+
+        <p class="hint">
+          Operations that need a password on an encrypted input will ask via the
+          password fields above. “Selected” = the file marked with ◉ in the list.
+        </p>
+        <p id="error" class="error" hidden></p>
+      </section>
+
+      <section class="card">
+        <h2>3 · Results</h2>
+        <ul id="results" class="file-list"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

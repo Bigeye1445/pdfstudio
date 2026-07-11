@@ -1,0 +1,46 @@
+{
+  "name": "pdfstudio",
+  "version": "0.1.0",
+  "description": "Client-side PDF toolkit powered by qpdf compiled to WebAssembly. Lock, unlock, change/remove passwords, merge, split, and rotate PDFs entirely in the browser — no server, files never leave the device.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./qpdf.wasm": "./dist/wasm/qpdf.wasm"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "build": "tsc -p tsconfig.build.json && npm run copy:wasm",
+    "copy:wasm": "mkdir -p dist/wasm && cp src/wasm/qpdf.js src/wasm/qpdf.wasm src/wasm/qpdf.d.ts dist/wasm/",
+    "test": "vitest run",
+    "demo": "vite demo --open"
+  },
+  "keywords": [
+    "pdf",
+    "wasm",
+    "webassembly",
+    "qpdf",
+    "encrypt",
+    "decrypt",
+    "merge",
+    "split",
+    "rotate",
+    "browser",
+    "client-side"
+  ],
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}

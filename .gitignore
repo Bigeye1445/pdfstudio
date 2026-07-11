@@ -1,0 +1,5 @@
+node_modules/
+dist/
+build-wasm/
+vendor/qpdf-*/
+test/fixtures/generated/
