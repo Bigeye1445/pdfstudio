@@ -45,8 +45,11 @@ export class QpdfRunner {
 
   static async create(options: PdfToolkitOptions = {}): Promise<QpdfRunner> {
     const { default: createQpdfModule } = await import('./wasm/qpdf.js');
-    const url = resolveWasmUrl(options.wasmUrl);
-    const compiled = await WebAssembly.compile(await loadWasmBytes(url));
+    // A caller-provided module skips fetch + compile — mandatory on
+    // platforms that forbid runtime wasm compilation (Cloudflare Workers).
+    const compiled =
+      options.wasmModule ??
+      (await WebAssembly.compile(await loadWasmBytes(resolveWasmUrl(options.wasmUrl))));
     return new QpdfRunner(compiled, createQpdfModule as (init: object) => Promise<QpdfModule>);
   }
 

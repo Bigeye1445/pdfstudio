@@ -1,0 +1,15 @@
+{
+  "name": "pdfstudio-example-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "pdfstudio": "file:../.."
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

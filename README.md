@@ -53,8 +53,8 @@ Node). No uploads, no server, no telemetry.
 | 🖼 **Images → PDF** | Build a PDF from JPEGs in pure TypeScript (no recompression) |
 | 🛠 **Escape hatch** | Run any qpdf CLI invocation via `raw()` |
 
-Works in browsers (main thread or Web Worker), and in Node.js ≥ 18 — handy
-for tests and scripts.
+Works in browsers (main thread or Web Worker), in Node.js ≥ 18, and on
+Cloudflare Workers — same API everywhere.
 
 ## Install
 
@@ -286,6 +286,31 @@ Operations are synchronous inside the wasm and run on the calling thread. For
 large documents, load the toolkit inside a Worker to keep the UI responsive —
 the API works there unchanged, and `Uint8Array` results transfer cheaply via
 `postMessage`.
+
+### Cloudflare Workers
+
+Works on the edge too. Workers forbid runtime wasm compilation, so import
+the wasm as a module (compiled at deploy time) and pass it in:
+
+```ts
+import { createPdfToolkit } from 'pdfstudio';
+import qpdfWasm from 'pdfstudio/qpdf.wasm';
+
+const pdf = await createPdfToolkit({ wasmModule: qpdfWasm });
+```
+
+A runnable example (self-test route + a `POST /unlock` endpoint) lives in
+[`examples/cloudflare-worker`](examples/cloudflare-worker):
+
+```sh
+cd examples/cloudflare-worker
+npm install
+npm run dev     # wrangler dev → http://localhost:8787
+```
+
+Mind the platform limits: PDF work needs real CPU time (the paid tier's
+budget is comfortable, the free tier's ~10 ms is not), and MEMFS lives in
+the wasm heap, so very large documents press against the 128 MB memory cap.
 
 ## Demo
 

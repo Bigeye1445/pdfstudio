@@ -250,4 +250,17 @@ export interface PdfToolkitOptions {
    * assets around or you serve the wasm from a CDN.
    */
   wasmUrl?: string | URL;
+  /**
+   * A precompiled `WebAssembly.Module` to use instead of fetching and
+   * compiling `qpdf.wasm`. Required on platforms that forbid runtime wasm
+   * compilation, like Cloudflare Workers:
+   *
+   * ```ts
+   * import qpdfWasm from 'pdfstudio/qpdf.wasm';
+   * const pdf = await createPdfToolkit({ wasmModule: qpdfWasm });
+   * ```
+   *
+   * Takes precedence over `wasmUrl`.
+   */
+  wasmModule?: WebAssembly.Module;
 }
