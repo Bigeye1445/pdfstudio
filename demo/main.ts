@@ -99,6 +99,21 @@ async function init() {
     addResult(rename(f.name, 'rotated'), rotated);
   });
 
+  wire('btn-watermark', async () => {
+    const f = current();
+    const stampIndex = Number(value('wm-stamp'));
+    const stamp = files[stampIndex];
+    need(stamp !== undefined, 'Load a second PDF to use as the stamp.');
+    need(stamp !== f, 'Pick a different file as the stamp (the selected file is the target).');
+    const out = await pdf.watermark(f.bytes, stamp.bytes, {
+      mode: value('wm-mode') as 'overlay' | 'underlay',
+      ...(checked('wm-repeat') && { repeat: 1 }),
+      ...passwordFor(f),
+      ...(stamp.encrypted && { stampPassword: value('unlock-password') }),
+    });
+    addResult(rename(f.name, 'watermarked'), out);
+  });
+
   wire('btn-delete', async () => {
     const f = current();
     const pages = value('delete-pages').trim();
@@ -193,6 +208,19 @@ function renderFiles() {
     li.append(remove);
     fileList.append(li);
   });
+
+  const stampSelect = $<HTMLSelectElement>('wm-stamp');
+  const previous = stampSelect.value;
+  stampSelect.innerHTML = '';
+  files.forEach((f, i) => {
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = `stamp: ${f.name}`;
+    stampSelect.append(option);
+  });
+  if ([...stampSelect.options].some((o) => o.value === previous)) {
+    stampSelect.value = previous;
+  }
 }
 
 function addResult(name: string, bytes: Uint8Array) {

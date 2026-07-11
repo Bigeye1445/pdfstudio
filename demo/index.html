@@ -85,6 +85,20 @@
         </details>
 
         <details>
+          <summary>Watermark</summary>
+          <p class="hint">Stamps pages from another loaded file onto the selected file.</p>
+          <div class="row">
+            <select id="wm-stamp"></select>
+            <select id="wm-mode">
+              <option value="overlay">overlay (on top)</option>
+              <option value="underlay">underlay (behind)</option>
+            </select>
+            <label><input type="checkbox" id="wm-repeat" checked /> tile stamp page 1 across all pages</label>
+            <button id="btn-watermark">Watermark selected</button>
+          </div>
+        </details>
+
+        <details>
           <summary>Extract pages</summary>
           <div class="row">
             <input id="extract-pages" placeholder="pages e.g. 2-5,9" />
